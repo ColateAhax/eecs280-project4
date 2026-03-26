@@ -127,39 +127,62 @@ double Classifier::log_prior(double num_posts_with_C)
     return log(num_posts_with_C / totalPosts);
 }
 
+// double Classifier::log_likelihood(string label, string word)
+// {
+//     auto it = label_word_count.find(label);
+//     map temp = it->second;
+//     auto it_2 = temp.find(word);
+//     //  W was seen in a post with label C in the training data
+//     if (it_2 != temp.end())
+//     {
+//         double num_posts_with_C_and_W = label_word_count[label][word];
+//         double num_posts_with_C = num_of_labels[label];
+
+//         return log(num_posts_with_C_and_W / num_posts_with_C);
+//     }
+
+//     //  W was NEVER seen in a post with label C in the training data
+//     else
+//     {
+//         //  W does not occur in posts labeled C
+//         //  but does occur in the training data overall
+//         if(num_posts_with_word.find(word) != num_posts_with_word.end())
+//         {
+//             double num_posts_with_W = num_posts_with_word[word];
+//             return log(num_posts_with_W / totalPosts);
+//         }
+
+//         //  Use when w does not occur anywhere at all in the training set.
+//         return log(1 / ( (double)  totalPosts ) );
+//     }
+// }
+
 double Classifier::log_likelihood(string label, string word)
 {
-    auto it = label_word_count.find(label);
-    map temp = it->second;
-    auto it_2 = temp.find(word);
     //  W was seen in a post with label C in the training data
-    if (it_2 != temp.end())
+    if (label_word_count.count(label) && label_word_count.at(label).count(word))
     {
-        double num_posts_with_C_and_W = label_word_count[label][word];
-        double num_posts_with_C = num_of_labels[label];
-
+        double num_posts_with_C_and_W = label_word_count.at(label).at(word);
+        double num_posts_with_C = num_of_labels.at(label);
         return log(num_posts_with_C_and_W / num_posts_with_C);
     }
 
     //  W was NEVER seen in a post with label C in the training data
-    else
-    {
-        //  W does not occur in posts labeled C
-        //  but does occur in the training data overall
-        if(num_posts_with_word.find(word) != num_posts_with_word.end())
-        {
-            double num_posts_with_W = num_posts_with_word[word];
-            return log(num_posts_with_W / totalPosts);
-        }
 
-        //  Use when w does not occur anywhere at all in the training set.
-        return log(1 / ( (double)  totalPosts ) );
+    //  W does not occur in posts labeled C
+    //  but does occur in the training data overall
+    else if (num_posts_with_word.count(word))
+    {
+        double num_posts_with_W = num_posts_with_word.at(word);
+        return log(num_posts_with_W / totalPosts);
     }
+    //  Use when w does not occur anywhere at all in the training set.
+    return log(1.0 / totalPosts);
 }
 
 double Classifier::log_probability(string label, set<string> content)
 {
-    double result = log_prior(num_of_labels[label]);
+    double result = log_prior(num_of_labels.at(label));
 
     for(auto it : content)
     {
@@ -186,7 +209,9 @@ void Classifier::predict(csvstream * file)
         set<string> words = unique_words(content);
         double best_log_prob = log_probability(best, words);
 
-        for (auto it = num_of_labels.begin()++; it != num_of_labels.end(); it++)
+        auto it = num_of_labels.begin();
+        it++;
+        for (; it != num_of_labels.end(); it++)
         {
             //if its the first item
             string currLabel = it->first;
@@ -198,6 +223,7 @@ void Classifier::predict(csvstream * file)
                 best = currLabel;
             }
         }
+
 
         cout << "  correct = " << correct_label << ", predicted = " << best;
         cout << ", log-probability score = " << best_log_prob <<endl;
