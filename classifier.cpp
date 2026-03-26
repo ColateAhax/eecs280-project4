@@ -46,7 +46,7 @@ class Classifier
 
         void print_classes();
         void print_parameters();
-        void predict();
+        void predict(csvstream * file);
 
     private:
         int totalPosts = 0;
@@ -54,7 +54,7 @@ class Classifier
         void print_row(string label, string content);
         double log_prior(double num_posts_with_C);
         double log_likelihood(string label, string word);
-        double log_probability(string label);
+        double log_probability(string label, set<string> content);
 };
 
 void Classifier::add_row_to_map(csvstream * file, bool trainOnly)
@@ -153,26 +153,61 @@ double Classifier::log_likelihood(string label, string word)
         }
 
         //  Use when w does not occur anywhere at all in the training set.
-         return log(1 / ( (double)  totalPosts ) );
+        return log(1 / ( (double)  totalPosts ) );
     }
 }
 
-double Classifier::log_probability(string label)
+double Classifier::log_probability(string label, set<string> content)
 {
     double result = log_prior(num_of_labels[label]);
 
-    for(auto it : num_posts_with_word)
+    for(auto it : content)
     {
-        string word = it.first;
-        result += log_likelihood(label, word);
+        result += log_likelihood(label, it);
     }
 
     return result;
 }
 
-void Classifier::predict()
+void Classifier::predict(csvstream * file)
 {
-    //
+    int correct = 0, total = 0;
+    std::map<std::string, std::string> curr_row;
+
+    while (*file >> curr_row)
+    {
+        string correct_label = curr_row["tag"];
+        string content = curr_row["content"];
+
+        //assumes the first one is the best match
+        string best = num_of_labels.begin()->first;
+
+        //filters out to only include unique words in content
+        set<string> words = unique_words(content);
+        double best_log_prob = log_probability(best, words);
+
+        for (auto it = num_of_labels.begin()++; it != num_of_labels.end(); it++)
+        {
+            //if its the first item
+            string currLabel = it->first;
+            double curr_log_prob = log_probability(currLabel, words);
+
+            if (curr_log_prob > best_log_prob)
+            {
+                best_log_prob = curr_log_prob;
+                best = currLabel;
+            }
+        }
+
+        cout << "  correct = " << correct_label << ", predicted = " << best;
+        cout << ", log-probability score = " << best_log_prob <<endl;
+        cout << "  content = " << content << "\n" << endl;
+
+        total++;
+        if (best == correct_label) correct++;
+    }
+    cout << "performance: " << correct << " / " << total;
+    cout << " posts predicted correctly" << endl;
 }
 
 int main(int argc, char* argv[]) 
@@ -214,6 +249,7 @@ int main(int argc, char* argv[])
 
         cout << "trained on " << clasi.getTotalPosts() << " examples" << endl;
         cout << "\ntest data:" << endl;
+        clasi.predict(&testCVS);
     }
 
     return 0;
